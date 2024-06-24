@@ -1,7 +1,7 @@
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import api from "@/lib/axios";
+import { useMutation } from "@tanstack/react-query";
 
 export default function Service({
   id,
@@ -9,14 +9,22 @@ export default function Service({
   url,
   image,
   editMode,
+  refetch,
 }: {
   id: string;
   displayName: string;
   url: string;
   image: string;
   editMode?: boolean;
+  refetch?: () => void;
 }) {
   const router = useRouter();
+
+  const deleteService = useMutation({
+    mutationKey: ["services"],
+    mutationFn: () => api.deleteService(id),
+    onSuccess: () => refetch?.(),
+  });
 
   const handleOpenLink = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!editMode) {
@@ -32,7 +40,7 @@ export default function Service({
 
   const handleClickDelete = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
-    await api.deleteService(id);
+    deleteService.mutate();
   };
 
   return (
@@ -49,26 +57,16 @@ export default function Service({
         <>
           <div
             style={{ width: "100px" }}
-            className="flex flex-col gap-1 align-items"
+            className="flex flex-col gap-1 align-items service-non-drag"
           >
             <span className="flex-grow" />
             <button
-              style={{
-                zIndex: 1000,
-                position: "relative",
-                pointerEvents: "auto",
-              }}
               className="h-full p-1 hover:bg-sky-500"
               onClick={handleClickEdit}
             >
               Ändra
             </button>
             <button
-              style={{
-                zIndex: 1000,
-                position: "relative",
-                pointerEvents: "auto",
-              }}
               className="h-full p-1 hover:bg-sky-500"
               onClick={handleClickDelete}
             >

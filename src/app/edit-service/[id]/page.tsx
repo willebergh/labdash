@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 
 import api from "@/lib/axios";
 import Button from "@/components/Button";
+import { useMutation } from "@tanstack/react-query";
 
 export default function CreateServicePage() {
   const [displayName, setDisplayName] = useState<string>("");
@@ -20,6 +21,22 @@ export default function CreateServicePage() {
 
   const router = useRouter();
   const params = useParams();
+
+  const updateService = useMutation({
+    mutationKey: ["services"],
+    mutationFn: (_: {
+      id: string;
+      displayName?: string;
+      url?: string;
+      image?: string;
+    }) => api.updateService(_),
+    onSuccess: () => {
+      router.push("/");
+    },
+    onError: () => {
+      setErrorMessage("Något gick fel.");
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,14 +58,9 @@ export default function CreateServicePage() {
       return;
     }
 
-    await api
-      .createService(displayName, url, image)
-      .then(() => {
-        router.push("/");
-      })
-      .catch(() => {
-        setErrorMessage("Något gick fel.");
-      });
+    if (!params.id) return;
+
+    updateService.mutate({ id: params.id as string, displayName, url, image });
   };
 
   useEffect(() => {
@@ -68,7 +80,7 @@ export default function CreateServicePage() {
       className="flex flex-row justify-center items-center"
     >
       <form onSubmit={handleSubmit} className="flex flex-col w-2/5 gap-8">
-        <h1 className="text-lg">Lägg till tjänst</h1>
+        <h1 className="text-lg">Ändra tjänst</h1>
         <input
           placeholder="Display Name"
           className={`p-4 border border-${

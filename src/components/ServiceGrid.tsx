@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { default as GridLayout, ItemCallback, Layout } from "react-grid-layout";
 
 import api from "@/lib/axios";
@@ -12,15 +13,21 @@ export default function ServiceGrid({
 }: {
   editMode?: boolean;
 }) {
-  const [services, setServices] = useState<ServiceType[]>([]);
   const [layout, setLayout] = useState<Layout[]>([]);
   const [width, setWidth] = useState<number>();
 
-  useEffect(() => {
-    api.getAllServices().then((data) => {
-      setServices(data.services);
-    });
+  const services = useQuery({
+    queryKey: ["services"],
+    queryFn: () => api.getAllServices(),
+  });
 
+  const updateService = useMutation({
+    mutationKey: ["services"],
+    mutationFn: (_: { id: string; gridX: number; gridY: number }) =>
+      api.updateService(_),
+  });
+
+  useEffect(() => {
     const handleResize = () => {
       setWidth(window.innerWidth);
     };
@@ -28,18 +35,6 @@ export default function ServiceGrid({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  useEffect(() => {
-    setLayout(
-      services.map(({ id, gridX, gridY }) => ({
-        i: id,
-        x: gridX,
-        y: gridY,
-        w: 1,
-        h: 2,
-      }))
-    );
-  }, [services]);
 
   const handleDragStop: ItemCallback = (
     layout: Layout[],
@@ -51,38 +46,49 @@ export default function ServiceGrid({
   ) => {
     console.log(element);
 
-    const { i, x, y } = newItem;
-    api
-      .updateService({
-        id: i,
-        gridX: x,
-        gridY: y,
-      })
-      .then(() => {
-        console.log("updated");
-      })
-      .catch(() => {
-        setLayout([...layout].map((_) => (_.i === i ? oldItem : _)));
-      });
+    const { i: id, x: gridX, y: gridY } = newItem;
+    updateService.mutate({
+      id,
+      gridX,
+      gridY,
+    });
   };
 
   return (
-    <GridLayout
-      className="layout"
-      layout={layout}
-      cols={6}
-      rowHeight={30}
-      width={width || window.innerWidth}
-      onLayoutChange={setLayout}
-      onDragStop={handleDragStop}
-      isDraggable={editMode}
-      isResizable={editMode}
-    >
-      {services.map((service) => (
-        <div key={service.id}>
-          <Service {...service} editMode={editMode} />
-        </div>
-      ))}
-    </GridLayout>
+    <>
+      {services.isLoading && "Loading"}
+      {services.isSuccess && (
+        <GridLayout
+          className="layout"
+          layout={(services.data.services as ServiceType[]).map(
+            ({ id, gridX, gridY }) => ({
+              i: id,
+              x: gridX,
+              y: gridY,
+              w: 1,
+              h: 2,
+            })
+          )}
+          cols={6}
+          rowHeight={30}
+          width={width || window.innerWidth}
+          onLayoutChange={setLayout}
+          onDragStop={handleDragStop}
+          isDraggable={editMode}
+          isResizable={editMode}
+          draggableCancel=".service-non-drag"
+        >
+          {(services.data.services as ServiceType[]).map((service) => (
+            <div key={service.id}>
+              <Service
+                {...service}
+                editMode={editMode}
+                refetch={() => services.refetch()}
+              />
+            </div>
+          ))}
+        </GridLayout>
+      )}
+    </>
   );
 }
